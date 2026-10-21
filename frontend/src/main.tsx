@@ -1,33 +1,18 @@
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
-
-const API = 'http://localhost:8000/api'
-type Post = { id: string; author_id: string; type: 'startup'|'vacancy'; title: string; description: string; looking_for: string }
-
-function App() {
-  const [token, setToken] = useState(localStorage.getItem('token') || '')
-  const [posts, setPosts] = useState<Post[]>([])
-  const [email, setEmail] = useState('founder@example.com')
-  const [password, setPassword] = useState('password123')
-  const [message, setMessage] = useState('')
-
-  async function login() {
-    const res = await fetch(`${API}/auth/login`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email, password}) })
-    if (!res.ok) return setMessage('Не удалось войти')
-    const data = await res.json(); localStorage.setItem('token', data.access_token); setToken(data.access_token); setMessage('')
-  }
-  async function loadPosts() {
-    const res = await fetch(`${API}/posts`, { headers: {Authorization: `Bearer ${token}`} })
-    if (res.ok) setPosts(await res.json())
-  }
-  async function respond(postId: string) {
-    const res = await fetch(`${API}/posts/${postId}/responses`, { method:'POST', headers:{Authorization:`Bearer ${token}`, 'Content-Type':'application/json'}, body:JSON.stringify({message:'Готов обсудить сотрудничество.'}) })
-    setMessage(res.ok ? 'Отклик отправлен' : (await res.json()).detail)
-  }
-  useEffect(() => { if (token) loadPosts() }, [token])
-  if (!token) return <main className="auth"><section className="card"><p className="eyebrow">STARTUP EXCHANGE</p><h1>Найдите свою команду</h1><p className="muted">Стартапы, вакансии и люди для совместных проектов.</p><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email"/><input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="Пароль"/><button onClick={login}>Войти</button>{message && <p className="error">{message}</p>}</section></main>
-  return <main><header><div><p className="eyebrow">STARTUP EXCHANGE</p><h1>Лента предложений</h1></div><button className="secondary" onClick={()=>{localStorage.removeItem('token');setToken('')}}>Выйти</button></header><section className="toolbar"><button>Все предложения</button><button className="secondary">Мои публикации</button><button className="secondary">Отклики</button></section>{message && <p className="notice">{message}</p>}<section className="grid">{posts.length ? posts.map(post=><article className="card" key={post.id}><span className="tag">{post.type === 'startup' ? 'Стартап' : 'Вакансия'}</span><h2>{post.title}</h2><p>{post.description}</p><p className="muted"><b>Ищет:</b> {post.looking_for}</p><button onClick={()=>respond(post.id)}>Откликнуться</button></article>) : <div className="empty"><h2>Пока нет предложений</h2><p className="muted">Когда появятся публикации, они будут показаны здесь.</p></div>}</section></main>
+const API='http://localhost:8000/api'
+type Post={id:string;author_id:string;type:'startup'|'vacancy';title:string;description:string;looking_for:string}
+type ResponseItem={id:string;post_id:string;applicant_id:string;message:string;status:string}
+function App(){
+ const[token,setToken]=useState(localStorage.getItem('token')||''),[posts,setPosts]=useState<Post[]>([]),[sent,setSent]=useState<ResponseItem[]>([]),[received,setReceived]=useState<ResponseItem[]>([]),[email,setEmail]=useState('founder@example.com'),[password,setPassword]=useState('password123'),[message,setMessage]=useState(''),[view,setView]=useState<'feed'|'create'|'cabinet'>('feed'),[form,setForm]=useState({type:'startup',title:'',description:'',looking_for:''}); const headers={Authorization:`Bearer ${token}`}
+ async function login(){const r=await fetch(`${API}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});if(!r.ok)return setMessage('Не удалось войти');const d=await r.json();localStorage.setItem('token',d.access_token);setToken(d.access_token);setMessage('')}
+ async function loadPosts(){const r=await fetch(`${API}/posts`,{headers});if(r.ok)setPosts(await r.json())}
+ async function loadCabinet(){const[s,r]=await Promise.all([fetch(`${API}/responses/sent`,{headers}),fetch(`${API}/responses/received`,{headers})]);if(s.ok)setSent(await s.json());if(r.ok)setReceived(await r.json())}
+ async function createPost(){const r=await fetch(`${API}/posts`,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(form)});if(r.ok){setMessage('Публикация создана');setForm({type:'startup',title:'',description:'',looking_for:''});setView('feed');loadPosts()}else setMessage((await r.json()).detail||'Не удалось создать публикацию')}
+ async function respond(id:string){const r=await fetch(`${API}/posts/${id}/responses`,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({message:'Готов обсудить сотрудничество.'})});setMessage(r.ok?'Отклик отправлен':(await r.json()).detail)}
+ useEffect(()=>{if(token)loadPosts()},[token])
+ if(!token)return <main className="auth"><section className="card"><p className="eyebrow">STARTUP EXCHANGE</p><h1>Найдите свою команду</h1><p className="muted">Стартапы, вакансии и люди для совместных проектов.</p><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email"/><input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="Пароль"/><button onClick={login}>Войти</button>{message&&<p className="error">{message}</p>}</section></main>
+ return <main><header><div><p className="eyebrow">STARTUP EXCHANGE</p><h1>{view==='feed'?'Лента предложений':view==='create'?'Новая публикация':'Личный кабинет'}</h1></div><button className="secondary" onClick={()=>{localStorage.removeItem('token');setToken('')}}>Выйти</button></header><section className="toolbar"><button onClick={()=>{setView('feed');loadPosts()}}>Лента</button><button className="secondary" onClick={()=>setView('create')}>Создать публикацию</button><button className="secondary" onClick={()=>{setView('cabinet');loadCabinet()}}>Личный кабинет</button></section>{message&&<p className="notice">{message}</p>}{view==='create'&&<section className="card form"><label>Тип<select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option value="startup">Стартап</option><option value="vacancy">Вакансия</option></select></label><label>Название<input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Название"/></label><label>Описание<textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Расскажите о предложении"/></label><label>Кого ищете<input value={form.looking_for} onChange={e=>setForm({...form,looking_for:e.target.value})} placeholder="Роль и навыки"/></label><button onClick={createPost}>Опубликовать</button></section>}{view==='cabinet'&&<section className="cabinet"><div className="card"><h2>Отправленные отклики</h2>{sent.length?sent.map(i=><p key={i.id}><b>{i.status}</b> · {i.message||'Без сообщения'}</p>):<p className="muted">Откликов пока нет.</p>}</div><div className="card"><h2>Полученные отклики</h2>{received.length?received.map(i=><p key={i.id}><b>{i.status}</b> · {i.message||'Без сообщения'}</p>):<p className="muted">Новых откликов нет.</p>}</div></section>}{view==='feed'&&<section className="grid">{posts.length?posts.map(post=><article className="card" key={post.id}><span className="tag">{post.type==='startup'?'Стартап':'Вакансия'}</span><h2>{post.title}</h2><p>{post.description}</p><p className="muted"><b>Ищет:</b> {post.looking_for}</p><button onClick={()=>respond(post.id)}>Откликнуться</button></article>):<div className="empty"><h2>Пока нет предложений</h2><p className="muted">Когда появятся публикации, они будут показаны здесь.</p></div>}</section>}</main>
 }
-
-createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)
+createRoot(document.getElementById('root')!).render(<StrictMode><App/></StrictMode>)
