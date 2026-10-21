@@ -12,6 +12,8 @@ dist/
 .coverage
 htmlcov/
 *.log
+*.egg-info/
+*.db
 postgres_data/
 .idea/
 .vscode/
