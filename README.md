@@ -4,10 +4,11 @@
 
 ## Запуск
 
-1. Скопируйте `.env.example` в `.env` и замените значения секретов.
-2. Выполните `docker compose up --build`.
-3. Откройте frontend на `http://localhost:5173`, backend healthcheck — `http://localhost:8000/health`.
-4. Для демонстрационных аккаунтов выполните внутри backend-контейнера `docker compose exec backend python -m scripts.seed`.
+1. Создайте в существующем PostgreSQL отдельную базу `startup_exchange` и пользователя с правами только на эту базу. Если PostgreSQL работает на том же сервере вне Docker, разрешите подключения от Docker-сети и используйте `host.docker.internal` в `DATABASE_URL`.
+2. Скопируйте `.env.example` в `.env` и укажите `DATABASE_URL`, секреты, публичный `DOMAIN` и `CORS_ORIGINS`.
+3. Направьте DNS-запись `DOMAIN` на сервер и откройте TCP-порты 80 и 443.
+4. Выполните `docker compose up --build -d`. Caddy автоматически получит и продлит TLS-сертификат Let's Encrypt для публичного домена.
+5. Откройте приложение на `https://<DOMAIN>`. Для демонстрационных аккаунтов выполните `docker compose exec backend python -m scripts.seed`.
 
 Аккаунты seed: `founder@example.com` и `builder@example.com`, пароль для обоих — `password123`.
 
@@ -45,7 +46,7 @@ pytest -q
 docker compose config
 ```
 
-Frontend собирается в Docker-образе Node.js командой `npm run build`; локальный npm-клиент не требуется для запуска через Compose.
+Frontend собирается в Node.js builder-слое Docker-образа и отдаётся Caddy из статических файлов; локальный npm-клиент не требуется. Caddy проксирует `/api` и `/health` во внутренний backend и автоматически обслуживает HTTPS.
 
 Схема базы управляется Alembic: backend-контейнер выполняет `alembic upgrade head` перед запуском API.
 
