@@ -25,7 +25,17 @@
 
 Доменные сущности `User`, `Post` и `Response` хранятся в PostgreSQL. Для локальных тестов используется SQLite. Уникальное ограничение `(post_id, applicant_id)` делает повторную отправку отклика безопасной на уровне базы данных.
 
-Основные маршруты: `POST /api/auth/login`, `GET /api/posts`, `POST /api/posts`, `GET /api/posts/{id}`, `POST /api/posts/{id}/responses`, `GET /api/responses/sent`, `GET /api/responses/received`, `PATCH /api/responses/{id}`.
+Основные маршруты: `POST /api/auth/login`, `POST /api/auth/telegram`, `POST /api/telegram/webhook`, `GET /api/posts`, `POST /api/posts`, `GET /api/posts/{id}`, `POST /api/posts/{id}/responses`, `GET /api/responses/sent`, `GET /api/responses/received`, `PATCH /api/responses/{id}`.
+
+## Telegram Mini App
+
+1. Создайте бота через `@BotFather` и положите токен в `TELEGRAM_BOT_TOKEN`.
+2. Разверните frontend по публичному HTTPS-адресу и задайте `VITE_API_URL`.
+3. Настройте кнопку меню вручную в BotFather или выполните `TELEGRAM_APP_URL=https://your-domain.example python -m scripts.configure_telegram`.
+4. Для команд бота задайте `TELEGRAM_WEBHOOK_SECRET` и установите webhook на `https://your-api.example/api/telegram/webhook`, передав тот же секрет в параметре `secret_token` метода `setWebhook`.
+5. Открытие приложения через Telegram автоматически вызывает `/api/auth/telegram`; backend проверяет подпись `initData` и создаёт JWT-сессию.
+
+Токен бота хранится только в backend-окружении. Frontend получает только Telegram SDK и URL API.
 
 ## Проверки
 
@@ -41,7 +51,7 @@ Frontend собирается в Docker-образе Node.js командой `n
 
 ## Решения и допущения
 
-Telegram WebApp SDK не подключён в прототипе, поэтому frontend работает как самостоятельное веб-приложение и готов к последующему добавлению Telegram-контекста. Реальные Telegram ID, внешние интеграции, файлы, уведомления, Redis и Kafka не входят в обязательный объём.
+Telegram WebApp SDK подключён, а Telegram ID сохраняется в профиле пользователя. Для локального запуска остаётся тестовый email/password-вход. Реальные платежи, загрузка файлов, Redis и Kafka не входят в обязательный объём.
 
 ## Использование ИИ
 

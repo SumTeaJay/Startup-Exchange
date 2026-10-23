@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +12,7 @@ from app.schemas import (LoginRequest, PostCreate, PostOut, ResponseCreate,
 from app.security import (create_access_token, decode_access_token,
                           validate_telegram_init_data, verify_password)
 from app.config import get_settings
+from app.telegram import send_message
 
 router = APIRouter(prefix="/api")
 bearer = HTTPBearer(auto_error=False)
@@ -65,6 +66,26 @@ def telegram_login(payload: TelegramAuthRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return TokenOut(access_token=create_access_token(user.id), user=user)
+
+
+@router.post("/telegram/webhook")
+def telegram_webhook(
+    update: dict,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+):
+    settings = get_settings()
+    if not settings.telegram_webhook_secret or x_telegram_bot_api_secret_token != settings.telegram_webhook_secret:
+        raise HTTPException(status_code=403, detail="Invalid Telegram webhook secret")
+    message = update.get("message") or {}
+    text = message.get("text", "")
+    chat_id = (message.get("chat") or {}).get("id")
+    if chat_id and text.startswith("/start"):
+        send_message(
+            settings.telegram_bot_token,
+            chat_id,
+            "Добро пожаловать в Startup Exchange! Откройте приложение кнопкой меню бота.",
+        )
+    return {"ok": True}
 
 
 @router.get("/me", response_model=UserOut)

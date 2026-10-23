@@ -5,7 +5,9 @@ import time
 from urllib.parse import urlencode
 
 import pytest
+from fastapi import HTTPException
 
+from app.api import telegram_webhook
 from app.security import validate_telegram_init_data
 
 
@@ -41,3 +43,10 @@ def test_expired_telegram_init_data_is_rejected():
 
     with pytest.raises(ValueError, match="expired"):
         validate_telegram_init_data(init_data, "bot-token", max_age_seconds=86400)
+
+
+def test_webhook_rejects_missing_secret():
+    with pytest.raises(HTTPException) as error:
+        telegram_webhook({}, None)
+
+    assert error.value.status_code == 403
