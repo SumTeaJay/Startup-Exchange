@@ -4,7 +4,15 @@
 
 ## Запуск
 
-1. Создайте в существующем PostgreSQL отдельную базу `startup_exchange` и пользователя с правами только на эту базу. Если PostgreSQL работает на том же сервере вне Docker, разрешите подключения от Docker-сети и используйте `host.docker.internal` в `DATABASE_URL`.
+1. Создайте в существующем PostgreSQL отдельную базу `startup_exchange` и пользователя с правами только на эту базу. Это можно сделать повторяемым скриптом:
+
+   ```bash
+   POSTGRES_ADMIN_URL='postgresql://admin:ADMIN_PASSWORD@127.0.0.1:5432/postgres' \
+   APP_DB_PASSWORD='LONG_RANDOM_APP_PASSWORD' \
+   ./scripts/provision_postgres.sh
+   ```
+
+   При необходимости задайте `APP_DB` и `APP_DB_USER`. Скрипт можно запускать повторно: он создаёт отсутствующие объекты и обновляет пароль прикладной роли. Если PostgreSQL работает на том же сервере вне Docker, разрешите подключения от Docker-сети и используйте `host.docker.internal` в `DATABASE_URL`.
 2. Скопируйте `.env.example` в `.env` и укажите `DATABASE_URL`, секреты, публичный `DOMAIN` и `CORS_ORIGINS`.
 3. Направьте DNS-запись `DOMAIN` на сервер и откройте TCP-порты 80 и 443.
 4. Выполните `docker compose up --build -d`. Caddy автоматически получит и продлит TLS-сертификат Let's Encrypt для публичного домена.
