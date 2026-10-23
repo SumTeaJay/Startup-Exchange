@@ -7,8 +7,11 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import Post, PostStatus, Response, ResponseStatus, User
 from app.schemas import (LoginRequest, PostCreate, PostOut, ResponseCreate,
-                          ResponseDecision, ResponseOut, TokenOut, UserOut)
-from app.security import create_access_token, decode_access_token, verify_password
+                          ResponseDecision, ResponseOut, TelegramAuthRequest,
+                          TokenOut, UserOut)
+from app.security import (create_access_token, decode_access_token,
+                          validate_telegram_init_data, verify_password)
+from app.config import get_settings
 
 router = APIRouter(prefix="/api")
 bearer = HTTPBearer(auto_error=False)
@@ -32,6 +35,35 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == payload.email))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    return TokenOut(access_token=create_access_token(user.id), user=user)
+
+
+@router.post("/auth/telegram", response_model=TokenOut)
+def telegram_login(payload: TelegramAuthRequest, db: Session = Depends(get_db)):
+    settings = get_settings()
+    try:
+        telegram_user = validate_telegram_init_data(
+            payload.init_data,
+            settings.telegram_bot_token,
+            settings.telegram_init_data_max_age_seconds,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+    telegram_id = int(telegram_user["id"])
+    user = db.scalar(select(User).where(User.telegram_id == telegram_id))
+    if user is None:
+        user = User(
+            telegram_id=telegram_id,
+            email=f"telegram-{telegram_id}@local.invalid",
+            password_hash="telegram-auth",
+            name=telegram_user.get("first_name", "Telegram user"),
+        )
+        db.add(user)
+    else:
+        user.name = telegram_user.get("first_name", user.name)
+    db.commit()
+    db.refresh(user)
     return TokenOut(access_token=create_access_token(user.id), user=user)
 
 
